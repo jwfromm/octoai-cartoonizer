@@ -6,9 +6,8 @@ import requests
 import random
 
 
-
 CLIP_ENDPOINT = "https://cartoonizer-clip-test-4jkxk521l3v1.octoai.cloud/"
-SD_ENDPOINT = "https://tvm-stable-diffusion-gcsv8y11zs17.octoai.cloud"
+SD_ENDPOINT = "https://tvm-demo-gcsv8y11zs17.octoai.cloud"
 
 # PIL helper
 def crop_center(pil_img, crop_width, crop_height):
@@ -29,7 +28,7 @@ def convert_image(img):
     byte_im = buf.getvalue()
     return byte_im
 
-def cartoonize_image(upload, model_name, strength, seed, loras):
+def cartoonize_image(upload, model_name, strength, seed, loras, steps):
     input_img = Image.open(upload)
     try:
         # Rotate based on Exif Data
@@ -91,7 +90,7 @@ def cartoonize_image(upload, model_name, strength, seed, loras):
         "seed": seed,
         "width": 512,
         "height": 512,
-        "num_inference_steps": 30,
+        "num_inference_steps": steps,
         "loras": loras,
     }
     reply = requests.post(
@@ -134,10 +133,6 @@ my_upload = st.file_uploader("Upload an image", type=["png", "jpg", "jpeg"])
 
 col1, col2 = st.columns(2)
 
-strength = st.slider(
-    ":brain: Imagination Slider (lower: closer to original, higher: more imaginative result)",
-    3, 10, 5)
-
 model_map = {
     "3D Cartoon": "cartoon",
     "2D Cartoon": "dark-sushi-mix",
@@ -151,6 +146,12 @@ model = st.selectbox(
 )
 
 model = model_map[model]
+
+strength = st.slider(
+    ":brain: Imagination Slider (lower: closer to original, higher: more imaginative result)",
+    3, 10, 5)
+
+steps = st.slider(":athletic_shoe: Select the number of steps, more can lead to higher output quality.", 20, 50, value=20)
 
 # Allow lora customization
 st.markdown(":test_tube: Try applying these different modifications")
@@ -168,7 +169,8 @@ lora_map = {
 for name, lora in lora_map.items():
     selected = st.checkbox(name)
     if selected:
-        loras[lora] = 1.0
+        value = st.slider(f"Select the strength for {name}", 0.0, 2.0)
+        loras[lora] = value
 
 seed = 0
 if st.button('Regenerate'):
@@ -189,4 +191,4 @@ st.sidebar.markdown(
 )
 
 if my_upload is not None:
-    cartoonize_image(my_upload, model, strength, seed, loras)
+    cartoonize_image(my_upload, model, strength, seed, loras, steps)
