@@ -141,7 +141,9 @@ if st.button("Randomize"):
     seed = random.randint(0, 1024)
 
 model_map = {
-    "3D Cartoon": "cartoon",
+    "3D Animated A": "cartoon_v2",
+    "3D Animated B": "3d_cartoon",
+    "3D Animated C": "cartoon",
     "2D Cartoon": "dark-sushi-mix",
     "RPG": "aZovyaRPGArtistTools_v3",
     "Anime": "toonyou_beta3",
@@ -156,10 +158,10 @@ model = model_map[model]
 
 strength = st.slider(
     ":brain: Imagination Slider (lower: closer to original, higher: more imaginative result)",
-    3, 10, 5)
+    3.0, 10.0, 7.0)
     
 extra_desc = st.text_input("Add more context to customize the output")
-extra_desc_strength = st.slider("Strength of extra context. The higher this is the more your text matters", 1, 5, value=1)
+extra_desc_strength = st.slider("Strength of extra context. The higher this is the more your text matters", 1.0, 5.0, value=1.0)
 if extra_desc:
     extra_desc = f"({extra_desc}: {extra_desc_strength})"
 
