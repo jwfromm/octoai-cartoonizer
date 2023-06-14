@@ -7,8 +7,8 @@ import random
 
 
 
-CLIP_ENDPOINT = "https://clip-interrogator-demo-4jkxk521l3v1.octoai.cloud"
-SD_ENDPOINT = "https://stable-diffusion-demo-4jkxk521l3v1.octoai.cloud"
+CLIP_ENDPOINT = "https://cartoonizer-clip-test-4jkxk521l3v1.octoai.cloud/"
+SD_ENDPOINT = "https://tvm-stable-diffusion-gcsv8y11zs17.octoai.cloud"
 
 # PIL helper
 def crop_center(pil_img, crop_width, crop_height):
@@ -29,7 +29,7 @@ def convert_image(img):
     byte_im = buf.getvalue()
     return byte_im
 
-def cartoonize_image(upload, strength, seed):
+def cartoonize_image(upload, model_name, strength, seed, loras):
     input_img = Image.open(upload)
     try:
         # Rotate based on Exif Data
@@ -78,20 +78,21 @@ def cartoonize_image(upload, strength, seed):
 
     # Prepare SD request for img2img
     sd_request = {
-        "image": image_out_b64.decode("utf8"),
+        "init_image": image_out_b64.decode("utf8"),
         "prompt": clip_reply,
         "strength": float(strength)/10,
         # The rest below is hard coded
-        "negative_prompt": "EasyNegative, drawn by bad-artist, sketch by bad-artist-anime, (bad_prompt:0.8), (artist name, signature, watermark:1.4), (ugly:1.2), (worst quality, poor details:1.4), bad-hands-5, badhandv4, blurry, nsfw",
-        "model": "cgi",
-        "vae": "YOZORA.vae.pt",
-        "sampler": "K_EULER_ANCESTRAL",
-        "cfg_scale": 7,
-        "num_images": 1,
+        "negative_prompt": "EasyNegative, drawn by bad-artist, sketch by bad-artist-anime, (bad_prompt:0.8), (artist name, signature, watermark:1.4), (ugly:1.2), (worst quality, poor details:1.4), badhandv4, blurry, nsfw",
+        "text_inversions": {"easynegative": "EasyNegative", "badhandv4": "badhandv4"},
+        "model_name": model_name,
+        "scheduler": "DPM++2MKarras",
+        "guidance_scale": 7,
+        "num_images_per_prompt": 1,
         "seed": seed,
         "width": 512,
         "height": 512,
-        "steps": 20
+        "num_inference_steps": 30,
+        "loras": loras,
     }
     reply = requests.post(
         "{}/predict".format(SD_ENDPOINT),
@@ -99,7 +100,7 @@ def cartoonize_image(upload, strength, seed):
         json=sd_request
     )
 
-    img_bytes = b64decode(reply.json()["completion"]["image_0"])
+    img_bytes = b64decode(reply.json()["image_0"])
     cartoonized = Image.open(BytesIO(img_bytes), formats=("png",))
 
     col2.write("Transformed Image :star2:")
@@ -137,11 +138,42 @@ strength = st.slider(
     ":brain: Imagination Slider (lower: closer to original, higher: more imaginative result)",
     3, 10, 5)
 
+model_map = {
+    "3D Cartoon": "cartoon",
+    "2D Cartoon": "dark-sushi-mix",
+    "RPG": "aZovyaRPGArtistTools_v3",
+    "Anime": "toonyou_beta3",
+}
+
+model = st.selectbox(
+    ":lower_left_paintbrush: Style Selector, changes the output style of your image.",
+    options=list(model_map.keys())
+)
+
+model = model_map[model]
+
+# Allow lora customization
+st.markdown(":test_tube: Try applying these different modifications")
+
+loras = {}
+#st
+lora_map = {
+    "Low Lighting": "LowRA",
+    "Simple Animation": "coolkids_v2.5",
+    "Pixelated": "pixelart",
+    "Pig Tails": "pigtail hairstyle",
+    "Steampunk": "steampunkschematics"
+}
+
+for name, lora in lora_map.items():
+    selected = st.checkbox(name)
+    if selected:
+        loras[lora] = 1.0
+
 seed = 0
 if st.button('Regenerate'):
     seed = random.randint(0, 1024)
 
-st.sidebar.image("octoml-octo-ai-logo-color.png")
 st.sidebar.markdown("The image to image generation is achieved via the [following checkpoint](https://civitai.com/models/75650/disney-pixar-cartoon-type-b) on CivitAI.")
 
 st.sidebar.markdown(
@@ -157,4 +189,4 @@ st.sidebar.markdown(
 )
 
 if my_upload is not None:
-    cartoonize_image(my_upload, strength, seed)
+    cartoonize_image(my_upload, model, strength, seed, loras)
