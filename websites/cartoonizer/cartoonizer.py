@@ -7,7 +7,7 @@ import random
 
 
 CLIP_ENDPOINT = "https://cartoonizer-clip-test-4jkxk521l3v1.octoai.cloud/"
-SD_ENDPOINT = "https://tvm-demo-gcsv8y11zs17.octoai.cloud"
+SD_ENDPOINT = "https://sd-demo-gcsv8y11zs17.octoai.cloud"
 
 # PIL helper
 def crop_center(pil_img, crop_width, crop_height):
@@ -28,7 +28,7 @@ def convert_image(img):
     byte_im = buf.getvalue()
     return byte_im
 
-def cartoonize_image(upload, model_name, strength, seed, loras, steps):
+def cartoonize_image(upload, model_name, strength, seed, loras, steps, extra_desc):
     input_img = Image.open(upload)
     try:
         # Rotate based on Exif Data
@@ -75,23 +75,25 @@ def cartoonize_image(upload, model_name, strength, seed, loras, steps):
     # Editable CLIP interrogator output
     # prompt = st.text_area("AI-generated, human editable label:", value=clip_reply)
 
+    prompt = extra_desc + ", " + clip_reply
     # Prepare SD request for img2img
     sd_request = {
         "init_image": image_out_b64.decode("utf8"),
-        "prompt": clip_reply,
+        "prompt": prompt, 
         "strength": float(strength)/10,
         # The rest below is hard coded
-        "negative_prompt": "EasyNegative, drawn by bad-artist, sketch by bad-artist-anime, (bad_prompt:0.8), (artist name, signature, watermark:1.4), (ugly:1.2), (worst quality, poor details:1.4), badhandv4, blurry, nsfw",
+        "negative_prompt": "EasyNegative, (ugly:1.2), (worst quality, poor details:1.4), badhandv4, blurry",
         "text_inversions": {"easynegative": "EasyNegative", "badhandv4": "badhandv4"},
         "model_name": model_name,
         "scheduler": "DPM++2MKarras",
-        "guidance_scale": 7,
+        "guidance_scale": 6.5,
         "num_images_per_prompt": 1,
         "seed": seed,
         "width": 512,
         "height": 512,
         "num_inference_steps": steps,
         "loras": loras,
+        "clip_skip": 2
     }
     reply = requests.post(
         "{}/predict".format(SD_ENDPOINT),
@@ -133,6 +135,11 @@ my_upload = st.file_uploader("Upload an image", type=["png", "jpg", "jpeg"])
 
 col1, col2 = st.columns(2)
 
+st.button("Generate")
+seed = 0
+if st.button("Randomize"):
+    seed = random.randint(0, 1024)
+
 model_map = {
     "3D Cartoon": "cartoon",
     "2D Cartoon": "dark-sushi-mix",
@@ -150,8 +157,13 @@ model = model_map[model]
 strength = st.slider(
     ":brain: Imagination Slider (lower: closer to original, higher: more imaginative result)",
     3, 10, 5)
+    
+extra_desc = st.text_input("Add more context to customize the output")
+extra_desc_strength = st.slider("Strength of extra context. The higher this is the more your text matters", 1, 5, value=1)
+if extra_desc:
+    extra_desc = f"({extra_desc}: {extra_desc_strength})"
 
-steps = st.slider(":athletic_shoe: Select the number of steps, more can lead to higher output quality.", 20, 50, value=20)
+steps = st.slider(":athletic_shoe: Select the number of steps, more can lead to higher output quality.", 20, 50, value=30)
 
 # Allow lora customization
 st.markdown(":test_tube: Try applying these different modifications")
@@ -162,7 +174,7 @@ lora_map = {
     "Low Lighting": "LowRA",
     "Simple Animation": "coolkids_v2.5",
     "Pixelated": "pixelart",
-    "Pig Tails": "pigtail hairstyle",
+    "Pig Tails": "pigtail_hairstyle",
     "Steampunk": "steampunkschematics"
 }
 
@@ -172,9 +184,6 @@ for name, lora in lora_map.items():
         value = st.slider(f"Select the strength for {name}", 0.0, 2.0)
         loras[lora] = value
 
-seed = 0
-if st.button('Regenerate'):
-    seed = random.randint(0, 1024)
 
 st.sidebar.markdown("The image to image generation is achieved via the [following checkpoint](https://civitai.com/models/75650/disney-pixar-cartoon-type-b) on CivitAI.")
 
@@ -191,4 +200,4 @@ st.sidebar.markdown(
 )
 
 if my_upload is not None:
-    cartoonize_image(my_upload, model, strength, seed, loras, steps)
+    cartoonize_image(my_upload, model, strength, seed, loras, steps, extra_desc)
